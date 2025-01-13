@@ -20,7 +20,7 @@ def generate_hw01(question):
             temperature=gpt_config['temperature']
     )
 
-    message__ = HumanMessage(
+    message = HumanMessage(
             content=[
                 {"type": "text", "text": question},
             ]
@@ -29,7 +29,8 @@ def generate_hw01(question):
     examples = [
         {
             "input": "2024年台灣10月紀念日有哪些?",
-            "output": """
+            "output": 
+            """
             "Result": [
                 {
                     "date": "2024-10-10",
@@ -61,8 +62,8 @@ def generate_hw01(question):
     )
 
     chain = final_prompt | llm 
-    response = chain.invoke(input=message__)
-    return response
+    response = chain.invoke(input=message)
+    return response.content
 
     
 def generate_hw02(question):
