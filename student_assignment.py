@@ -4,7 +4,7 @@ import traceback
 from model_configurations import get_model_configuration
 
 from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
 
 gpt_chat_version = 'gpt-4o'
@@ -20,24 +20,22 @@ def generate_hw01(question):
             temperature=gpt_config['temperature']
     )
 
-    message = HumanMessage(
-            content=[
-                {"type": "text", "text": question},
-            ]
-    )
-
     examples = [
         {
-            "input": "2024年台灣10月紀念日有哪些?",
-            "output": 
-            """
+            "input":"2024年台灣10月紀念日有哪些?",
+            "output":
+            """{
             "Result": [
                 {
                     "date": "2024-10-10",
                     "name": "國慶日"
+                },
+                {
+                    "date": "2024-10-11",
+                    "name": "重陽節"
                 }
             ]
-            """
+            }"""
         }
     ]
 
@@ -62,7 +60,7 @@ def generate_hw01(question):
     )
 
     chain = final_prompt | llm 
-    response = chain.invoke(input=message)
+    response = chain.invoke({"input":question})
     return response.content
 
     
@@ -93,3 +91,6 @@ def demo(question):
     response = llm.invoke([message])
     
     return response
+
+respone = generate_hw01("2024年台灣10月紀念日有哪些?")
+print(respone)
