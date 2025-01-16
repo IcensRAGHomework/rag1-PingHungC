@@ -30,18 +30,45 @@ llm = AzureChatOpenAI(
 
 examples = [
     {
-        "input":"{year}年台灣{month}月紀念日有哪些?",
+        "input":"2024年台灣10月紀念日有哪些?",
         "output": 
         """
         {
             "Result": [
                 {
-                    "date": "YYYY-MM-DD",
-                    "name": string
+                    "date": "2024-10-10",
+                    "name": "國慶日"
+                },
+                {
+                    "date": "2024-10-09",
+                    "name": "重陽節"
+                },
+                {
+                    "date": "2024-10-21",
+                    "name": "華僑節"
+                },
+                {
+                    "date": "2024-10-25",
+                    "name": "台灣光復節"
+                },
+                {
+                    "date": "2024-10-31",
+                    "name": "萬聖節"
                 }
             ]
         }
         """
+    },
+    {
+        "input":'根據先前的節日清單，這個節日是否有在該月份清單？{"date": "10-31", "name": "蔣公誕辰紀念日"}',
+        "output":
+        """{
+            "Result": 
+                {
+                    "add": true,
+                    "reason": "蔣中正誕辰紀念日並未包含在十月的節日清單中。目前十月的現有節日包括國慶日、重陽節、華僑節、台灣光復節和萬聖節。因此，如果該日被認定為節日，應該將其新增至清單中。"
+                }
+        }"""
     },
 ]
 
@@ -139,21 +166,8 @@ def generate_hw03(question2, question3):
         {"input": question2},
         config={"configurable": {"session_id": "holidays"}},
     )
-    examples_hw3 = [
-            {
-                "input":"問題中的紀念日是否在節日清單中?",
-                "output":
-                """{
-                    "Result": 
-                        {
-                            "add": bool,
-                            "reason": string
-                        }
-                }"""
-        }
-    ]
     example_prompt_hw3 = FewShotChatMessagePromptTemplate(
-        examples=examples_hw3,
+        examples=examples,
         example_prompt=ChatPromptTemplate.from_messages([
             ("human", "{input}"),
             ("ai", "{output}")
