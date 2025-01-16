@@ -28,40 +28,22 @@ llm = AzureChatOpenAI(
         temperature=gpt_config['temperature']
     )
 
-prompt = hub.pull("hwchase17/openai-functions-agent")
-
 examples = [
+    {
+        "input":"{year}年台灣{month}月紀念日有哪些?",
+        "output": 
+        """
         {
-            "input":"2024年台灣10月紀念日有哪些?",
-            "output": 
-            """
-            {
-                "Result": [
-                    {
-                        "date": "2024-10-10",
-                        "name": "國慶日"
-                    },
-                    {
-                        "date": "2024-10-09",
-                        "name": "重陽節"
-                    },
-                    {
-                        "date": "2024-10-21",
-                        "name": "華僑節"
-                    },
-                    {
-                        "date": "2024-10-25",
-                        "name": "台灣光復節"
-                    },
-                    {
-                        "date": "2024-10-31",
-                        "name": "萬聖節"
-                    }
-                ]
-            }
-            """
+            "Result": [
+                {
+                    "date": "YYYY-MM-DD",
+                    "name": string
+                }
+            ]
         }
-    ]
+        """
+    },
+]
 
 example_prompt = FewShotChatMessagePromptTemplate(
     examples=examples,
@@ -69,6 +51,15 @@ example_prompt = FewShotChatMessagePromptTemplate(
         ("human", "{input}"),
         ("ai", "{output}")
     ]),
+)
+
+final_prompt = ChatPromptTemplate.from_messages(
+    [
+        ("ai", "{agent_scratchpad}"),
+        ("system", "請根據問題列出台灣的紀念日，以 JSON 格式輸出:date : 節日日期，日期格式YYYY-MM-DD。name : 節日名稱，名稱格式為繁體中文。"),
+        example_prompt,
+        ("human", "{input}"),
+    ]
 )
 
 store = {}
@@ -125,15 +116,6 @@ def generate_hw01(question):
 
 def generate_hw02(question):
  
-    final_prompt = ChatPromptTemplate.from_messages(
-        [
-            ("ai", "{agent_scratchpad}"),
-            ("system", "請根據問題列出台灣的紀念日，以 JSON 格式輸出:"),
-            example_prompt,
-            ("human", "{input}"),
-        ]
-    )
-
     tools = [holiday_lookup_tool]
     agent = create_openai_functions_agent(llm, tools, final_prompt)
     agent_executor = AgentExecutor(agent=agent, tools=tools)
@@ -143,35 +125,33 @@ def generate_hw02(question):
     return response
 
 def generate_hw03(question2, question3):
-    
     tools = [holiday_lookup_tool]
-    agent = create_openai_functions_agent(llm, tools, prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools)
+    agent = create_openai_functions_agent(llm, tools, final_prompt)
+    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=False)
     history_handler = RunnableWithMessageHistory(
         agent_executor,
         get_session_history,
         input_messages_key="input",
         history_messages_key="history",
     )
+    
     history_handler.invoke(
         {"input": question2},
         config={"configurable": {"session_id": "holidays"}},
     )
-
     examples_hw3 = [
-        {
-            "input":"蔣公誕辰紀念日是否有在十月的節日清單中?",
-            "output":
-            """{
-                "Result": 
-                    {
-                        "add": false,
-                        "reason": "蔣中正誕辰紀念日並未包含在十月的節日清單中。目前十月的現有節日包括國慶日、重陽節、華僑節、台灣光復節和萬聖節。因此，如果該日被認定為節日，應該將其新增至清單中。"
-                    }
-            }"""
+            {
+                "input":"問題中的紀念日是否在節日清單中?",
+                "output":
+                """{
+                    "Result": 
+                        {
+                            "add": bool,
+                            "reason": string
+                        }
+                }"""
         }
     ]
-
     example_prompt_hw3 = FewShotChatMessagePromptTemplate(
         examples=examples_hw3,
         example_prompt=ChatPromptTemplate.from_messages([
@@ -179,23 +159,20 @@ def generate_hw03(question2, question3):
             ("ai", "{output}")
         ]),
     )
-
-    final_prompt = ChatPromptTemplate.from_messages(
+    final_prompt_hw3 = ChatPromptTemplate.from_messages(
         [
-            ("system", "請根據問題回答，以 JSON 格式輸出:add : 這是一個布林值，表示是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，如果不存在，則為 true；否則為 false。reason : 描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，以及當前清單的內容。"),
+            ("system", "請根據問題列出台灣的紀念日，以 JSON 格式輸出:date : add : 這是一個布林值，表示是否需要將節日新增到節日清單中。根據問題判斷該節日是否存在於清單中，如果不存在，則為 true；否則為 false。 reason : 描述為什麼需要或不需要新增節日，具體說明是否該節日已經存在於清單中，以及當前清單的內容。"),
             example_prompt_hw3,
             ("human", "{input}"),
         ]
     )
-    
-    runnable = final_prompt | llm
+    runnable = final_prompt_hw3 | llm
     history_handler = RunnableWithMessageHistory(
         runnable,
         get_session_history,
         input_messages_key="input",
         history_messages_key="history",
     )
-    
     response = history_handler.invoke(
         {"input": question3},
         config={"configurable": {"session_id": "holidays"}},
@@ -226,6 +203,8 @@ def demo(question):
     return response
 
 #response = generate_hw01("2024年台灣10月紀念日有哪些?")
+#print(response)
 #response = generate_hw02("2024年台灣10月紀念日有哪些?")
-#response = generate_hw03("2024年台灣10月紀念日有哪些?", "蔣公誕辰紀念日是否有在剛剛詢問的回答中?")
+#print(response)
+#response = generate_hw03("2024年台灣10月紀念日有哪些?", '根據先前的節日清單，這個節日是否有在該月份清單？{"date": "10-31", "name": "蔣公誕辰紀念日"}')
 #print(response)
