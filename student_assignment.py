@@ -4,17 +4,19 @@ import requests
 
 from model_configurations import get_model_configuration
 
-from langchain import hub
 from langchain_openai import AzureChatOpenAI
-from langchain_core.messages import HumanMessage
-from langchain.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.prompts import ChatPromptTemplate, FewShotChatMessagePromptTemplate, PromptTemplate, SystemMessagePromptTemplate
 from langchain.agents import create_openai_functions_agent, AgentExecutor
 from langchain.tools import tool
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
 
-
+import base64
+from mimetypes import guess_type
 
 gpt_chat_version = 'gpt-4o'
 gpt_config = get_model_configuration(gpt_chat_version)
@@ -127,9 +129,34 @@ def holiday_lookup_tool(country: str, year: str) -> str:
 
 def generate_hw01(question):
 
+    examples = [
+        {
+            "input":"2024年台灣10月紀念日有哪些?",
+            "output": 
+            """
+            {
+                "Result": [
+                    {
+                        "date": "2024-10-10",
+                        "name": "國慶日"
+                    }
+                ]
+            }
+            """
+        }
+    ]
+
+    example_prompt = FewShotChatMessagePromptTemplate(
+        examples=examples,
+        example_prompt=ChatPromptTemplate.from_messages([
+            ("human", "{input}"),
+            ("ai", "{output}")
+        ]),
+    )
+
     final_prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", "請根據問題列出台灣的紀念日，以 JSON 格式輸出"),
+            ("system", "請根據問題列出台灣的紀念日，以 JSON 格式輸出:date : 節日日期，日期格式YYYY-MM-DD。name : 節日名稱，名稱格式為繁體中文。"),
             example_prompt,
             ("human", "{input}"),
         ]
@@ -193,8 +220,49 @@ def generate_hw03(question2, question3):
     )
 
     return response.content
-    
+
+def local_image_to_data_url(image_path):
+    # Guess the MIME type of the image based on the file extension
+    mime_type, _ = guess_type(image_path)
+    if mime_type is None:
+        mime_type = 'application/octet-stream'  # Default MIME type if none is found
+
+    # Read and encode the image file
+    with open(image_path, "rb") as image_file:
+        base64_encoded_data = base64.b64encode(image_file.read()).decode('utf-8')
+
+    # Construct the data URL
+    return f"data:{mime_type};base64,{base64_encoded_data}"
+
 def generate_hw04(question):
+    image_path = './baseball.png'
+    image_data_url = local_image_to_data_url(image_path)
+    system_message = """You are a helpful assistant, you only can output a number"""
+    
+    messages = [
+        SystemMessage(content=system_message),
+        HumanMessage(content=[
+            {
+                "type": "text",
+                "text": question
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": image_data_url
+                }
+            }
+        ])
+    ]
+
+    
+    response = llm.invoke(messages)
+    
+    score = int(response.content.strip())
+    
+    result = json.dumps({"Result": {"score": score}}, indent=2)
+    
+    return result
     pass
     
 def demo(question):
@@ -221,4 +289,6 @@ def demo(question):
 #response = generate_hw02("2024年台灣10月紀念日有哪些?")
 #print(response)
 #response = generate_hw03("2024年台灣10月紀念日有哪些?", '根據先前的節日清單，這個節日是否有在該月份清單？{"date": "10-31", "name": "蔣公誕辰紀念日"}')
+#print(response)
+#response = generate_hw04("請問中華台北的積分是多少?")
 #print(response)
